@@ -1,39 +1,49 @@
 package com.github.ssjam;
 
+import akka.actor.ActorSystem;
+import akka.http.javadsl.server.HttpApp;
+import akka.http.javadsl.server.Route;
+import akka.http.javadsl.settings.ServerSettings;
+import com.typesafe.config.ConfigFactory;
 import gnu.getopt.Getopt;
 
-import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.util.concurrent.ExecutionException;
 
-public class ProxyService {
+public class ProxyService extends HttpApp {
     private int port = 5978;
     private boolean isDone = false;
+    private String address = "127.0.0.1";
 
-    public static void main(String[] args) {
-        ProxyService proxy = new ProxyService(getPort(args));
-        proxy.run();
+    ProxyService() {
+    }
+
+    ProxyService(int p) {
+        if(p > 0 && p < 65536) {
+            this.port = p;
+        }
+    }
+
+    ProxyService(String address, int p) {
+        this(p);
+        this.address = address;
     }
 
     public int status() {
         return this.port;
     }
 
-    public void stop() {
-        this.isDone = true;
+    @Override
+    protected Route routes() {
+        return path("hello", () ->
+            get(() ->
+                complete("<h1>Say hello to akka-http</h1>")
+            )
+        );
     }
 
-    public void test() {
-        ProxyService proxy = new ProxyService();
+    public static void main(String[] args) {
+        ProxyService proxy = new ProxyService(getPort(args));
         proxy.run();
-    }
-
-    ProxyService() {}
-
-    ProxyService(int p) {
-        if(p > 0 && p < 65536) {
-            this.port = p;
-        }
     }
 
     private static int getPort(String[] args) {
@@ -48,57 +58,19 @@ public class ProxyService {
     }
 
     private void run() {
+        // Starting the server
+        final ActorSystem system = ActorSystem.apply("mediaProxy");
+        final ServerSettings settings = ServerSettings.create(ConfigFactory.load()).withVerboseErrorMessages(true);
         try {
-            ServerSocket server = new ServerSocket(this.port);
-
-            System.out.println("Server started...");
-
-            while (!isDone) {
-                Socket socket = server.accept();
-
-                new ServerThread(socket).start();
-            }
-
-            System.out.println("Server stopped");
-        } catch (IOException ex) {
+            new ProxyService().startServer(address, port, settings, system);
+        } catch (ExecutionException ex) {
+            // Terminate the ActorSystem when exiting
+            system.terminate();
             ex.printStackTrace();
-        }
-    }
-
-    static class ServerThread extends Thread {
-        private Socket socket = null;
-
-        ServerThread(Socket socket) {
-            this.socket = socket;
-        }
-
-        public void start() {
-            System.out.println("Thread " + this.getName() + " starting...");
-            try {
-                InputStream in = socket.getInputStream();
-                OutputStream out = socket.getOutputStream();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-                PrintWriter writer = new PrintWriter(new OutputStreamWriter(out));
-
-                String content = null;
-                int i = 0;
-                while ((content = reader.readLine()) != null) {
-                    System.out.println(i++ + ": " + content);
-                    if(content.trim().isEmpty()) {
-                        break;
-                    }
-                }
-
-                writer.print("HTTP/1.1 200\r\n\ngood by!");
-                writer.flush();
-
-                socket.close();
-
-                System.out.println("Thread " + this.getName() + " stopped");
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
+        } catch (InterruptedException ex) {
+            // Terminate the ActorSystem when exiting
+            system.terminate();
+            ex.printStackTrace();
         }
     }
 }

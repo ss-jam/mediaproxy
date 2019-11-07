@@ -19,10 +19,18 @@ class ProxyServiceSpec extends UnitSpec {
     }
 
     "running" should {
-      "accept open connections" in {
+      "accept open connections to specific path" in {
         val ps = new ProxyService(9966);
-        val res = Source.fromURL("http://localhost:9966/hello")
+        val res = Source.fromURL("http://localhost:9966/test")
         res.mkString must equal("<h1>Say hello to akka-http</h1>")
+      }
+      "accept open connection so any path with specific root" in {
+        val res = Source.fromURL("http://localhost:9966/hello/world!")
+        res.mkString must equal("ready to run GET...")
+      }
+      "do something different for path to specific root" in {
+        val res = Source.fromURL("http://localhost:9966/hello")
+        res.mkString must equal("Hello Baby!")
       }
       "accept TLS connections" in {
         fail("not yet implemented")

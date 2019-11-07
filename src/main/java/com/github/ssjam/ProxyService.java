@@ -34,11 +34,30 @@ public class ProxyService extends HttpApp {
 
     @Override
     protected Route routes() {
-        return path("hello", () ->
-            get(() ->
-                complete("<h1>Say hello to akka-http</h1>")
-            )
+        return concat(
+                path("test", () ->
+                    complete("<h1>Say hello to akka-http</h1>")
+                ),
+                get(() -> concat(
+                    path("hello", () ->
+                            complete("Hello Baby!")
+                    ),
+                    complete(handleGet())
+                )),
+                post(() ->
+                    complete("ready to run POST...")
+                ),
+                put(() ->
+                    complete("ready to run PUT...")
+                ),
+                delete(() ->
+                    complete("ready to run DELETE...")
+                )
         );
+    }
+
+    private String handleGet() {
+        return("ready to run GET...");
     }
 
     public static void main(String[] args) {

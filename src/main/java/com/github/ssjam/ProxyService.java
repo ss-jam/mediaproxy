@@ -1,5 +1,7 @@
 package com.github.ssjam;
 
+import akka.actor.Props;
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.http.javadsl.server.HttpApp;
 import akka.http.javadsl.server.Route;
@@ -13,6 +15,9 @@ public class ProxyService extends HttpApp {
     private int port = 5978;
     private boolean isDone = false;
     private String address = "127.0.0.1";
+
+    private ActorRef manager = null;
+    private ActorRef getHandler = null;
 
     ProxyService() {
     }
@@ -79,9 +84,11 @@ public class ProxyService extends HttpApp {
     private void run() {
         // Starting the server
         final ActorSystem system = ActorSystem.apply("mediaProxy");
+        manager = system.actorOf(Guardian.props(true), "Guardian");
+        getHandler = system.actorOf(Props.create(InternalGetHandler.class), "WorkerManager");
         final ServerSettings settings = ServerSettings.create(ConfigFactory.load()).withVerboseErrorMessages(true);
         try {
-            new ProxyService().startServer(address, port, settings, system);
+            new ProxyService().startServer(address, port, settings);
         } catch (ExecutionException ex) {
             // Terminate the ActorSystem when exiting
             system.terminate();
